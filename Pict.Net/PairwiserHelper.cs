@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -8,6 +9,7 @@ namespace Pict.Net
 {
 	public static class PairwiserHelper
 	{
+		[Obsolete]
 		public static IReadOnlyList<KeyValuePair<object, object>[]> Generate(IEnumerable<KeyValuePair<object, object>> model, int order = 2)
 		{
 			var parameters = ToParameters(model);
@@ -16,13 +18,45 @@ namespace Pict.Net
 				.SelectMany(p => p.Values)
 				.ToDictionary(v => v.Name, v => v.Value);
 
-			var output = RunPict(CreateModelText(parameters), $"/O:{order}");
+			var text = CreateModelText(parameters);
+			var output = RunPict(text, $"/O:{order}");
+			var parsedOutput = ParseOutput(output);
 
 			return ParseOutput(output).Select(
 				line => line.Select(pair => new KeyValuePair<object, object>(parameterDict[pair.Key], parameterValueDict[pair.Value])).ToArray()
 			).ToArray();
 		}
 
+		public static IReadOnlyList<KeyValuePair<IModelParameter, IModelValue>[]> Generate(IReadOnlyList<IModelParameter> parameters)
+		{
+			if (ExistsDuplicatedValueReference(parameters.SelectMany(p => p.Values).ToArray()))
+			{
+				throw new ArgumentException("!!! Detected Duplicated Values !!!");
+			}
+
+			var surrogateNames = CreateSurrogateNames(parameters);
+
+			var modelText = CreateModelText(parameters, v => surrogateNames.Single(pair => ReferenceEquals(pair.Key, v)).Value);
+			var pictOutput = RunPict(modelText, "");
+			var parsedOutput = ParseOutput(pictOutput);
+
+			IModelParameter parameterSolver(string name)
+			{
+				return parameters.Single(p => p.ParameterName == name);
+			}
+			IModelValue valueSolverMap(string surrogate)
+			{
+				return surrogateNames.Single(pair => pair.Value == surrogate).Key;
+			}
+
+			return parsedOutput.Select(
+				@case => @case.Select(
+					pair => RestoreCase(pair.Key, pair.Value, parameterSolver, valueSolverMap)
+				).ToArray()
+			).ToArray();
+		}
+
+		[Obsolete]
 		static IReadOnlyList<Parameter> ToParameters(IEnumerable<KeyValuePair<object, object>> model)
 		{
 			var groups = model.GroupBy(pair => pair.Key, pair => pair.Value);
@@ -44,6 +78,29 @@ namespace Pict.Net
 
 		}
 
+		static bool ExistsDuplicatedValueReference(IReadOnlyCollection<object> collection)
+		{
+			var join =
+				from x in collection
+				select Enumerable.Count(
+					from y in collection
+					where ReferenceEquals(x, y)
+					select 1
+				);
+			return join.Any(n => n > 1);
+		}
+
+		static IReadOnlyCollection<KeyValuePair<IModelValue, string>> CreateSurrogateNames(IReadOnlyCollection<IModelParameter> parameters)
+		{
+
+			var objectValues = parameters.SelectMany(p => p.Values);
+
+			var result = objectValues.Select((value, i) => new KeyValuePair<IModelValue, string>(value, $"v{i}")).ToArray();
+
+			return result;
+		}
+
+		[Obsolete]
 		static IEnumerable<string> CreateModelText(IReadOnlyList<Parameter> parameters)
 		{
 			foreach (var parameter in parameters)
@@ -52,7 +109,22 @@ namespace Pict.Net
 			}
 		}
 
-		static IEnumerable<string> RunPict(IEnumerable<string> model, string options)
+		static IEnumerable<string> CreateModelText(IEnumerable<IModelParameter> parameters, Func<IModelValue, string> objecValueToSurrogateName)
+		{
+			foreach (var parameter in parameters)
+			{
+				if (parameter.IsNumber)
+				{
+					yield return parameter.ParameterName + ":" + string.Join(",", parameter.Values.Select(x => x.ToValueString()));
+				}
+				else
+				{
+					yield return parameter.ParameterName + ":" + string.Join(",", parameter.Values.Select(objecValueToSurrogateName));
+				}
+			}
+		}
+
+		static IReadOnlyList<string> RunPict(IEnumerable<string> model, string options)
 		{
 			var stdout = new List<string>();
 			var stderr = new List<string>();
@@ -108,8 +180,27 @@ namespace Pict.Net
 			}
 		}
 
+		static KeyValuePair<IModelParameter, IModelValue> RestoreCase(string header, string value, Func<string, IModelParameter> parameterSolver, Func<string, IModelValue> valueSolver)
+		{
+			var parameter = parameterSolver(header);
+			bool negative = value[0] == '~';
+			string body = negative ? value.Substring(1) : value;
 
+			if (parameter.IsNumber)
+			{
+				object valueObject = Convert.ChangeType(body, parameter.ValueType);
+				var ctor = typeof(ModelValue<>).MakeGenericType(parameter.ValueType).GetConstructor(new[] { parameter.ValueType, typeof(bool) });
+				var modelValue = (IModelValue)ctor.Invoke(new object[] { valueObject, negative });
+				return new KeyValuePair<IModelParameter, IModelValue>(parameter, modelValue);
+			}
+			else
+			{
+				var modelValue = valueSolver(body);
+				return new KeyValuePair<IModelParameter, IModelValue>(parameter, modelValue);
+			}
+		}
 
+		[Obsolete]
 		class Parameter
 		{
 			public object Key { get; set; }
@@ -118,13 +209,14 @@ namespace Pict.Net
 			public IReadOnlyList<ParameterValue> Values { get; set; }
 		}
 
+		[Obsolete]
 		class ParameterValue
 		{
 			public object Value { get; set; }
 			public string Name { get; set; }
 		}
 
-
+		[Obsolete]
 		static IEnumerable<string> StreamToEnumerable(StreamReader strm)
 		{
 			while (!strm.EndOfStream)
@@ -134,6 +226,85 @@ namespace Pict.Net
 		}
 
 	}
+
+	public interface IModelParameter
+	{
+		string ParameterName { get; }
+
+		Type ValueType { get; }
+
+		bool IsString { get; }
+
+		bool IsNumber { get; }
+
+		IReadOnlyList<IModelValue> Values { get; }
+	}
+
+	public class ModelParameter<T> : IModelParameter
+	{
+		public string ParameterName { get; }
+
+		public Type ValueType => typeof(T);
+
+		public IReadOnlyList<ModelValue<T>> Values { get; }
+		IReadOnlyList<IModelValue> IModelParameter.Values => Values;
+
+		public bool IsString => Type.GetTypeCode(typeof(T)) == TypeCode.String;
+
+		public bool IsNumber => new bool[] {
+			typeof(T) == typeof(int)
+		}.Any(x => x);
+
+		public ModelParameter(string name, IEnumerable<ModelValue<T>> values)
+		{
+			ParameterName = name;
+			Values = values.ToArray();
+		}
+	}
+
+	public interface IModelValue : ICloneable
+	{
+		object Value { get; }
+		bool Negative { get; }
+		string ToValueString();
+		new IModelValue Clone();
+	}
+
+	public class ModelValue
+	{
+		public static ModelValue<T> Create<T>(T value, bool negative = false)
+		{
+			return new ModelValue<T>(value, negative);
+		}
+
+		public static ModelValue<T> Create<T>(T value) => new ModelValue<T>(value, false);
+	}
+
+	public class ModelValue<T> : IModelValue, ICloneable
+	{
+		public T Value { get; }
+		public bool Negative { get; }
+		object IModelValue.Value => Value;
+
+		public string ToValueString()
+		{
+			if (Value is float f32) { return f32.ToString("R"); }
+			else if (Value is double f64) { return f64.ToString("R"); }
+			else { return Value.ToString(); }
+		}
+
+		public ModelValue(T value, bool negative = false)
+		{
+			Value = value;
+		}
+
+		public ModelValue<T> Create(T value) => new ModelValue<T>(value);
+
+		public ModelValue<T> Clone() => (ModelValue<T>)MemberwiseClone();
+		IModelValue IModelValue.Clone() => Clone();
+		object ICloneable.Clone() => Clone();
+	}
+
 
 	public class TempFile : IDisposable
 	{

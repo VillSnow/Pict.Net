@@ -22,8 +22,7 @@ namespace Pict.Net.Run
 			pairwiser.AddParameter("Cluster size", new[] { 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536 });
 			pairwiser.AddParameter("Compression", new[] { true, false });
 
-			var results = pairwiser.GenerateValues(
-				2,
+			var results = pairwiser.GetCases(
 				"Type",
 				"Size",
 				"Format method",
