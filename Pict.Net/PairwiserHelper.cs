@@ -288,14 +288,25 @@ namespace Pict.Net
 
 		public string ToValueString()
 		{
-			if (Value is float f32) { return f32.ToString("R"); }
-			else if (Value is double f64) { return f64.ToString("R"); }
-			else { return Value.ToString(); }
+			string result;
+			if (Value is float f32) { result = f32.ToString("R"); }
+			else if (Value is double f64) { result = f64.ToString("R"); }
+			else { result = Value.ToString(); }
+
+			if (Negative) result = "~" + result;
+
+			return result;
 		}
 
 		public ModelValue(T value, bool negative = false)
 		{
 			Value = value;
+			Negative = negative;
+		}
+
+		public static implicit operator ModelValue<T>(T value)
+		{
+			return new ModelValue<T>(value);
 		}
 
 		public ModelValue<T> Create(T value) => new ModelValue<T>(value);

@@ -10,7 +10,12 @@ namespace Pict.Net
 
 		public Pairwiser AddParameter<T>(string parameterName, IEnumerable<T> values)
 		{
-			parameters.Add(new ModelParameter<T>(parameterName, values.Select(ModelValue.Create)));
+			return AddParameter(parameterName, values.Select(ModelValue.Create));
+		}
+
+		public Pairwiser AddParameter<T>(string parameterName, IEnumerable<ModelValue<T>> values)
+		{
+			parameters.Add(new ModelParameter<T>(parameterName, values));
 			return this;
 		}
 

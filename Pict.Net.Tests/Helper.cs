@@ -30,7 +30,10 @@ namespace Pict.Net.Tests
 				Assert.AreEqual(expected1.Length, actual1.Length);
 				foreach (var (expected2, actual2) in expected1.Zip(actual1, (a, b) => (a, b)))
 				{
-					Assert.AreEqual(expected2, actual2.ToString());
+					string expected3 = expected2;
+					if (expected3[0] == '~') expected3 = expected3.Substring(1);
+
+					Assert.AreEqual(expected3, actual2.ToString());
 				}
 			}
 
