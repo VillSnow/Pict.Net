@@ -95,7 +95,7 @@ namespace Pict.Net
 
 			var objectValues = parameters.SelectMany(p => p.Values);
 
-			var result = objectValues.Select((value, i) => new KeyValuePair<IModelValue, string>(value, $"v{i}")).ToArray();
+			var result = objectValues.Select((value, i) => new KeyValuePair<IModelValue, string>(value, $"{(value.Negative ? "~" : "")}v{i}")).ToArray();
 
 			return result;
 		}
@@ -183,11 +183,12 @@ namespace Pict.Net
 		static KeyValuePair<IModelParameter, IModelValue> RestoreCase(string header, string value, Func<string, IModelParameter> parameterSolver, Func<string, IModelValue> valueSolver)
 		{
 			var parameter = parameterSolver(header);
-			bool negative = value[0] == '~';
-			string body = negative ? value.Substring(1) : value;
 
 			if (parameter.IsNumber)
 			{
+				bool negative = value[0] == '~';
+				string body = negative ? value.Substring(1) : value;
+
 				object valueObject = Convert.ChangeType(body, parameter.ValueType);
 				var ctor = typeof(ModelValue<>).MakeGenericType(parameter.ValueType).GetConstructor(new[] { parameter.ValueType, typeof(bool) });
 				var modelValue = (IModelValue)ctor.Invoke(new object[] { valueObject, negative });
@@ -195,7 +196,7 @@ namespace Pict.Net
 			}
 			else
 			{
-				var modelValue = valueSolver(body);
+				var modelValue = valueSolver(value);
 				return new KeyValuePair<IModelParameter, IModelValue>(parameter, modelValue);
 			}
 		}
