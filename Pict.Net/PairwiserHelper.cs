@@ -34,9 +34,9 @@ namespace Pict.Net
 				throw new ArgumentException("!!! Detected Duplicated Values !!!");
 			}
 
-			var surrogateNames = CreateSurrogateNames(parameters);
+			var surrogateMgr = new SurrogateManager(parameters);
 
-			var modelText = CreateModelText(parameters, v => surrogateNames.Single(pair => ReferenceEquals(pair.Key, v)).Value);
+			var modelText = CreateModelText(parameters, surrogateMgr);
 			var pictOutput = RunPict(modelText, "");
 			var parsedOutput = ParseOutput(pictOutput);
 
@@ -44,14 +44,10 @@ namespace Pict.Net
 			{
 				return parameters.Single(p => p.ParameterName == name);
 			}
-			IModelValue valueSolverMap(string surrogate)
-			{
-				return surrogateNames.Single(pair => pair.Value == surrogate).Key;
-			}
 
 			return parsedOutput.Select(
 				@case => @case.Select(
-					pair => RestoreCase(pair.Key, pair.Value, parameterSolver, valueSolverMap)
+					pair => RestoreCase(pair.Key, pair.Value, parameterSolver, surrogateMgr)
 				).ToArray()
 			).ToArray();
 		}
@@ -109,7 +105,7 @@ namespace Pict.Net
 			}
 		}
 
-		static IEnumerable<string> CreateModelText(IEnumerable<IModelParameter> parameters, Func<IModelValue, string> objecValueToSurrogateName)
+		static IEnumerable<string> CreateModelText(IEnumerable<IModelParameter> parameters, SurrogateManager surrogateManager)
 		{
 			foreach (var parameter in parameters)
 			{
@@ -119,7 +115,7 @@ namespace Pict.Net
 				}
 				else
 				{
-					yield return parameter.ParameterName + ":" + string.Join(",", parameter.Values.Select(objecValueToSurrogateName));
+					yield return parameter.ParameterName + ":" + string.Join(",", parameter.Values.Select(surrogateManager.Getsurrogate));
 				}
 			}
 		}
@@ -180,7 +176,7 @@ namespace Pict.Net
 			}
 		}
 
-		static KeyValuePair<IModelParameter, IModelValue> RestoreCase(string header, string value, Func<string, IModelParameter> parameterSolver, Func<string, IModelValue> valueSolver)
+		static KeyValuePair<IModelParameter, IModelValue> RestoreCase(string header, string value, Func<string, IModelParameter> parameterSolver, SurrogateManager surrogateManager)
 		{
 			var parameter = parameterSolver(header);
 
@@ -196,7 +192,7 @@ namespace Pict.Net
 			}
 			else
 			{
-				var modelValue = valueSolver(value);
+				var modelValue = surrogateManager.GetModelValue(value);
 				return new KeyValuePair<IModelParameter, IModelValue>(parameter, modelValue);
 			}
 		}
