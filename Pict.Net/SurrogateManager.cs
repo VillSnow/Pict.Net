@@ -22,7 +22,7 @@ namespace Pict.Net
 		
 		public IModelValue GetModelValue(string surrogate)
 		{
-			return list.Where(pair => pair.Value == surrogate).Select(pair => pair.k).Single();
+			return list.Where(pair => pair.Value == surrogate).Select(pair => pair.Key).Single();
 		}
 
 	}
