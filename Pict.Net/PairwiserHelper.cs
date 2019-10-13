@@ -86,16 +86,6 @@ namespace Pict.Net
 			return join.Any(n => n > 1);
 		}
 
-		static IReadOnlyCollection<KeyValuePair<IModelValue, string>> CreateSurrogateNames(IReadOnlyCollection<IModelParameter> parameters)
-		{
-
-			var objectValues = parameters.SelectMany(p => p.Values);
-
-			var result = objectValues.Select((value, i) => new KeyValuePair<IModelValue, string>(value, $"{(value.Negative ? "~" : "")}v{i}")).ToArray();
-
-			return result;
-		}
-
 		[Obsolete]
 		static IEnumerable<string> CreateModelText(IReadOnlyList<Parameter> parameters)
 		{
@@ -211,15 +201,6 @@ namespace Pict.Net
 		{
 			public object Value { get; set; }
 			public string Name { get; set; }
-		}
-
-		[Obsolete]
-		static IEnumerable<string> StreamToEnumerable(StreamReader strm)
-		{
-			while (!strm.EndOfStream)
-			{
-				yield return strm.ReadLine();
-			}
 		}
 
 	}
