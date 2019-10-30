@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Linq.Expressions;
 
 namespace Pict.Net
 {
@@ -27,7 +28,10 @@ namespace Pict.Net
 			).ToArray();
 		}
 
-		public static IReadOnlyList<KeyValuePair<IModelParameter, IModelValue>[]> Generate(IReadOnlyList<IModelParameter> parameters)
+		public static IReadOnlyList<KeyValuePair<IModelParameter, IModelValue>[]> Generate(
+			IReadOnlyList<IModelParameter> parameters,
+			IReadOnlyCollection<IReadOnlyCollection<KeyValuePair<IModelParameter, IModelValue>>> exclusions
+		)
 		{
 			if (ExistsDuplicatedValueReference(parameters.SelectMany(p => p.Values).ToArray()))
 			{
@@ -37,7 +41,8 @@ namespace Pict.Net
 			var surrogateMgr = new SurrogateManager(parameters);
 
 			var modelText = CreateModelText(parameters, surrogateMgr);
-			var pictOutput = RunPict(modelText, "");
+			var constraintText = CreateConstraintText(exclusions, surrogateMgr);
+			var pictOutput = RunPict(modelText.Concat(constraintText), "");
 			var parsedOutput = ParseOutput(pictOutput);
 
 			IModelParameter parameterSolver(string name)
@@ -107,6 +112,28 @@ namespace Pict.Net
 				{
 					yield return parameter.ParameterName + ":" + string.Join(",", parameter.Values.Select(surrogateManager.Getsurrogate));
 				}
+			}
+		}
+
+		static IEnumerable<string> CreateConstraintText(IReadOnlyCollection<IReadOnlyCollection<KeyValuePair<IModelParameter, IModelValue>>> exclusions, SurrogateManager surrogateManager)
+		{
+			foreach (var exclusion in exclusions)
+			{
+				yield return string.Join(" OR ",
+					exclusion.Select(
+						pair =>
+						{
+							if (pair.Key.IsNumber)
+							{
+								return $"[{pair.Key.ParameterName}] <> {pair.Value.ToValueString()}";
+							}
+							else
+							{
+								return $"[{pair.Key.ParameterName}] <> \"{surrogateManager.Getsurrogate(pair.Value)}\"";
+							}
+						}
+					)
+				) + ";";
 			}
 		}
 
@@ -293,7 +320,6 @@ namespace Pict.Net
 		IModelValue IModelValue.Clone() => Clone();
 		object ICloneable.Clone() => Clone();
 	}
-
 
 	public class TempFile : IDisposable
 	{

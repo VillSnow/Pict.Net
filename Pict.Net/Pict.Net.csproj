@@ -18,6 +18,22 @@
     <None Update="LICENSES\pict.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="Pairwiser.AddConstraint.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Pairwiser.AddConstraint.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Pairwiser.AddConstraint.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Pairwiser.AddConstraint.tt</DependentUpon>
+    </Compile>
   </ItemGroup>
 
 </Project>
