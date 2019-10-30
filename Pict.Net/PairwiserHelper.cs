@@ -104,14 +104,7 @@ namespace Pict.Net
 		{
 			foreach (var parameter in parameters)
 			{
-				if (parameter.IsNumber)
-				{
-					yield return parameter.ParameterName + ":" + string.Join(",", parameter.Values.Select(x => x.ToValueString()));
-				}
-				else
-				{
-					yield return parameter.ParameterName + ":" + string.Join(",", parameter.Values.Select(surrogateManager.Getsurrogate));
-				}
+				yield return parameter.ParameterName + ":" + string.Join(",", parameter.Values.Select(surrogateManager.Getsurrogate));
 			}
 		}
 
@@ -121,17 +114,7 @@ namespace Pict.Net
 			{
 				yield return string.Join(" OR ",
 					exclusion.Select(
-						pair =>
-						{
-							if (pair.Key.IsNumber)
-							{
-								return $"[{pair.Key.ParameterName}] <> {pair.Value.ToValueString()}";
-							}
-							else
-							{
-								return $"[{pair.Key.ParameterName}] <> \"{surrogateManager.Getsurrogate(pair.Value)}\"";
-							}
-						}
+						pair => $"[{pair.Key.ParameterName}] <> \"{surrogateManager.Getsurrogate(pair.Value)}\""
 					)
 				) + ";";
 			}
@@ -197,21 +180,9 @@ namespace Pict.Net
 		{
 			var parameter = parameterSolver(header);
 
-			if (parameter.IsNumber)
-			{
-				bool negative = value[0] == '~';
-				string body = negative ? value.Substring(1) : value;
+			var modelValue = surrogateManager.GetModelValue(value);
+			return new KeyValuePair<IModelParameter, IModelValue>(parameter, modelValue);
 
-				object valueObject = Convert.ChangeType(body, parameter.ValueType);
-				var ctor = typeof(ModelValue<>).MakeGenericType(parameter.ValueType).GetConstructor(new[] { parameter.ValueType, typeof(bool) });
-				var modelValue = (IModelValue)ctor.Invoke(new object[] { valueObject, negative });
-				return new KeyValuePair<IModelParameter, IModelValue>(parameter, modelValue);
-			}
-			else
-			{
-				var modelValue = surrogateManager.GetModelValue(value);
-				return new KeyValuePair<IModelParameter, IModelValue>(parameter, modelValue);
-			}
 		}
 
 		[Obsolete]
@@ -237,10 +208,6 @@ namespace Pict.Net
 		string ParameterName { get; }
 
 		Type ValueType { get; }
-
-		bool IsString { get; }
-
-		bool IsNumber { get; }
 
 		IReadOnlyList<IModelValue> Values { get; }
 	}
