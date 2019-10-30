@@ -1,32 +1,13 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Linq.Expressions;
 
 namespace Pict.Net
 {
 	internal static class PairwiserHelper
 	{
-		[Obsolete]
-		public static IReadOnlyList<KeyValuePair<object, object>[]> Generate(IEnumerable<KeyValuePair<object, object>> model, int order = 2)
-		{
-			var parameters = ToParameters(model);
-			var parameterDict = parameters.ToDictionary(p => p.Name, p => p.Key);
-			var parameterValueDict = parameters
-				.SelectMany(p => p.Values)
-				.ToDictionary(v => v.Name, v => v.Value);
-
-			var text = CreateModelText(parameters);
-			var output = RunPict(text, $"/O:{order}");
-			var parsedOutput = ParseOutput(output);
-
-			return ParseOutput(output).Select(
-				line => line.Select(pair => new KeyValuePair<object, object>(parameterDict[pair.Key], parameterValueDict[pair.Value])).ToArray()
-			).ToArray();
-		}
 
 		public static IReadOnlyList<KeyValuePair<IModelParameter, IModelValue>[]> Generate(
 			IReadOnlyList<IModelParameter> parameters,
@@ -55,27 +36,6 @@ namespace Pict.Net
 			).ToArray();
 		}
 
-		[Obsolete]
-		static IReadOnlyList<Parameter> ToParameters(IEnumerable<KeyValuePair<object, object>> model)
-		{
-			var groups = model.GroupBy(pair => pair.Key, pair => pair.Value);
-
-			return groups.Select(
-				(g, i) => new Parameter
-				{
-					Key = g.Key,
-					Name = $"P{i}",
-					Values = g.Select(
-						(v, j) => new ParameterValue
-						{
-							Value = v,
-							Name = $"P{i}V{j}"
-						}
-					).ToList()
-				}
-			).ToList();
-
-		}
 
 		static bool ExistsDuplicatedValueReference(IReadOnlyCollection<object> collection)
 		{
@@ -87,15 +47,6 @@ namespace Pict.Net
 					select 1
 				);
 			return join.Any(n => n > 1);
-		}
-
-		[Obsolete]
-		static IEnumerable<string> CreateModelText(IReadOnlyList<Parameter> parameters)
-		{
-			foreach (var parameter in parameters)
-			{
-				yield return parameter.Name + ":" + string.Join(",", parameter.Values.Select(x => x.Name));
-			}
 		}
 
 		static IEnumerable<string> CreateModelText(IEnumerable<IModelParameter> parameters, SurrogateManager surrogateManager)
@@ -175,32 +126,6 @@ namespace Pict.Net
 				}
 			}
 		}
-
-		static KeyValuePair<IModelParameter, IModelValue> RestoreCase(string header, string value, Func<string, IModelParameter> parameterSolver, SurrogateManager surrogateManager)
-		{
-			var parameter = parameterSolver(header);
-
-			var modelValue = surrogateManager.GetModelValue(value);
-			return new KeyValuePair<IModelParameter, IModelValue>(parameter, modelValue);
-
-		}
-
-		[Obsolete]
-		class Parameter
-		{
-			public object Key { get; set; }
-			public string Name { get; set; }
-
-			public IReadOnlyList<ParameterValue> Values { get; set; }
-		}
-
-		[Obsolete]
-		class ParameterValue
-		{
-			public object Value { get; set; }
-			public string Name { get; set; }
-		}
-
 	}
 
 	public interface IModelParameter
