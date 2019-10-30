@@ -9,7 +9,7 @@ namespace Pict.Net
 	public partial class Pairwiser
 	{
 		readonly List<IModelParameter> parameters = new List<IModelParameter>();
-		readonly List<IReadOnlyCollection<KeyValuePair<IModelParameter, IModelValue>>> exclusions = new List<IReadOnlyCollection<KeyValuePair<IModelParameter, IModelValue>>>();
+		readonly List<ModelValueIntersection> exclusions = new List<ModelValueIntersection>();
 
 		public Pairwiser AddParameter<T>(string parameterName, IEnumerable<T> values)
 		{
@@ -49,7 +49,7 @@ namespace Pict.Net
 			var a = crossed.ToArray();
 			var b = a.First();
 			var excludeValuesSeq = crossed.Where(args => !(bool)constraint.DynamicInvoke(args.Select(x => x.Value).ToArray()));
-			exclusions.AddRange(excludeValuesSeq.Select(vs => parameters.Zip(vs, (k, v) => new KeyValuePair<IModelParameter, IModelValue>(k, v)).ToArray()));
+			exclusions.AddRange(excludeValuesSeq.Select(vs =>new ModelValueIntersection(vs)));
 			return this;
 		}
 
@@ -104,5 +104,13 @@ namespace Pict.Net
 		}
 	}
 
+	internal class ModelValueIntersection
+	{
+		public IReadOnlyList<IModelValue> List { get; }
 
+		public ModelValueIntersection(IReadOnlyList<IModelValue> modelValues)
+		{
+			List = modelValues.ToArray();
+		}
+	}
 }

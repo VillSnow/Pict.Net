@@ -8,7 +8,7 @@ using System.Linq.Expressions;
 
 namespace Pict.Net
 {
-	public static class PairwiserHelper
+	internal static class PairwiserHelper
 	{
 		[Obsolete]
 		public static IReadOnlyList<KeyValuePair<object, object>[]> Generate(IEnumerable<KeyValuePair<object, object>> model, int order = 2)
@@ -30,7 +30,7 @@ namespace Pict.Net
 
 		public static IReadOnlyList<KeyValuePair<IModelParameter, IModelValue>[]> Generate(
 			IReadOnlyList<IModelParameter> parameters,
-			IReadOnlyCollection<IReadOnlyCollection<KeyValuePair<IModelParameter, IModelValue>>> exclusions
+			IReadOnlyCollection<ModelValueIntersection> exclusions
 		)
 		{
 			if (ExistsDuplicatedValueReference(parameters.SelectMany(p => p.Values).ToArray()))
@@ -45,14 +45,12 @@ namespace Pict.Net
 			var pictOutput = RunPict(modelText.Concat(constraintText), "");
 			var parsedOutput = ParseOutput(pictOutput);
 
-			IModelParameter parameterSolver(string name)
-			{
-				return parameters.Single(p => p.ParameterName == name);
-			}
-
 			return parsedOutput.Select(
 				@case => @case.Select(
-					pair => RestoreCase(pair.Key, pair.Value, parameterSolver, surrogateMgr)
+					pair => new KeyValuePair<IModelParameter, IModelValue>(
+						surrogateMgr.GetModelParameter(pair.Key), 
+						surrogateMgr.GetModelValue(pair.Value)
+					)
 				).ToArray()
 			).ToArray();
 		}
@@ -104,18 +102,20 @@ namespace Pict.Net
 		{
 			foreach (var parameter in parameters)
 			{
-				yield return parameter.ParameterName + ":" + string.Join(",", parameter.Values.Select(surrogateManager.Getsurrogate));
+				yield return surrogateManager.GetSurrogate(parameter) + ":" + string.Join(",", parameter.Values.Select(surrogateManager.GetSurrogate));
 			}
 		}
 
-		static IEnumerable<string> CreateConstraintText(IReadOnlyCollection<IReadOnlyCollection<KeyValuePair<IModelParameter, IModelValue>>> exclusions, SurrogateManager surrogateManager)
+		static IEnumerable<string> CreateConstraintText(IReadOnlyCollection<ModelValueIntersection> exclusions, SurrogateManager surrogateManager)
 		{
 			foreach (var exclusion in exclusions)
 			{
 				yield return string.Join(" OR ",
-					exclusion.Select(
-						pair => $"[{pair.Key.ParameterName}] <> \"{surrogateManager.Getsurrogate(pair.Value)}\""
-					)
+					from value in exclusion.List
+					let parameter = surrogateManager.GetParentModelParameter(value)
+					let parameterSurrogate = surrogateManager.GetSurrogate(parameter)
+					let valueSurrogate = surrogateManager.GetSurrogate(value)
+					select $"[{parameterSurrogate}] <> \"{valueSurrogate}\""
 				) + ";";
 			}
 		}
